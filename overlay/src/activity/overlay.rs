@@ -333,7 +333,11 @@ impl Overlay {
 
         // Session closed without SessionEnd (window closed, crash, killed):
         // its Claude Code process is gone, so forget the record.
-        let gone = record.agent_pid != 0 && !process::process_alive(record.agent_pid, &record.agent_exe);
+        // Only trust it after a grace period, so a short-lived launcher can
+        // never hide a session that just started.
+        let gone = record.agent_pid != 0
+            && store::now_ms().saturating_sub(record.updated_ms) > 60_000
+            && !process::process_alive(record.agent_pid, &record.agent_exe);
         if gone {
             store::delete_record(&settings::sessions_dir(), &record.session_id);
         }

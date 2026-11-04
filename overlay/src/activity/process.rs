@@ -95,15 +95,14 @@ pub fn find_host(cwd: &str, prompt_submitted: bool) -> Host {
 }
 
 /// The Claude Code process running this hook: the nearest ancestor that is
-/// not a shell. Returns (pid, exe file name).
+/// a known Claude Code runtime. None when it cannot be told apart, in which
+/// case liveness falls back to the inactivity timeout.
 pub fn find_agent() -> Option<(u32, String)> {
-    const SHELLS: &[&str] = &[
-        "bash.exe", "sh.exe", "cmd.exe", "powershell.exe", "pwsh.exe", "conhost.exe",
-        "openconsole.exe", "env.exe", "wsl.exe", "zsh.exe",
-    ];
+    const AGENTS: &[&str] = &["claude.exe", "node.exe", "bun.exe"];
     parent_chain()
         .into_iter()
-        .find(|(_, exe)| !SHELLS.contains(&exe.to_ascii_lowercase().as_str()))
+        .take(4)
+        .find(|(_, exe)| AGENTS.contains(&exe.to_ascii_lowercase().as_str()))
 }
 
 /// True while `pid` is still the same program that wrote the record.
