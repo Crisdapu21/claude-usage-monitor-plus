@@ -1,0 +1,112 @@
+name: Build on upstream release
+
+# Every few hours: if CodeZeno published a new release (or this repo's
+# additions changed), rebuild it with the activity badge and publish it here.
+# The app's built-in updater reads releases from this repo.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  push:
+    branches: [main]
+    paths: ["overlay/**", "scripts/**", ".github/workflows/**"]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if this version was already released"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: CodeZeno/Claude-Code-Usage-Monitor
+  ASSET: claude-code-usage-monitor.exe
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_tag: ${{ steps.v.outputs.upstream_tag }}
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)
+          ver=${tag#v}
+          IFS=. read -r major minor patch <<< "${ver%%[-+]*}"
+          rev=$(tr -d '[:space:]' < overlay/REVISION)
+          version="$major.$minor.$((patch * 100 + rev))"
+          build=true
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then build=false; fi
+          if [ "${{ inputs.force }}" = "true" ]; then build=true; fi
+          echo "upstream_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "Upstream $tag -> v$version (build=$build)"
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plus
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM }}
+          ref: ${{ needs.check.outputs.upstream_tag }}
+          path: upstream
+
+      - name: Apply additions
+        shell: pwsh
+        run: |
+          $v = python plus/scripts/apply.py upstream "https://github.com/${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if ($v.Trim() -ne "${{ needs.check.outputs.version }}") { throw "version mismatch: $v" }
+
+      - name: Test
+        working-directory: upstream
+        run: |
+          cargo test --locked activity
+          cargo test --locked updater
+
+      - name: Build
+        working-directory: upstream
+        run: cargo build --release --locked
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ needs.check.outputs.version }} (upstream ${{ needs.check.outputs.upstream_tag }})
+          body: |
+            Claude Code Usage Monitor ${{ needs.check.outputs.upstream_tag }} de [${{ env.UPSTREAM }}](https://github.com/${{ env.UPSTREAM }}/releases/tag/${{ needs.check.outputs.upstream_tag }}) + insignia de actividad de Claude (revisión del overlay incluida en el número de versión).
+          files: upstream/target/release/${{ env.ASSET }}
+
+  report-failure:
+    needs: [check, build]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="La compilación con upstream ${{ needs.check.outputs.upstream_tag }} falló"
+          if ! gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number' | grep -q .; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body "Revisa ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Normalmente es que upstream cambió algo que el módulo usa; pídele a Claude que lo ajuste."
+          fi
