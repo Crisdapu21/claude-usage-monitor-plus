@@ -40,7 +40,7 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
 ```json
 {
   "enabled": true,
-  "style": "dots",
+  "style": "bars",
   "show_when_focused": false,
   "position": "auto",
   "size_percent": 100,
@@ -50,7 +50,7 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
 }
 ```
 
-- `style`: animación de "trabajando": `dots` (puntos), `ring` (anillo), `bars` (barras), `pulse` (pulso) o `spark` (destello).
+- `style`: animación de "trabajando": `bars` (barras, por defecto), `dots` (puntos), `ring` (anillo), `pulse` (pulso) o `spark` (destello).
 - `position`: `auto` (el lado con más espacio), `left` o `right`.
 - `show_when_focused`: `true` para verla aunque tengas la ventana de Claude al frente.
 - `done_minutes`: cuánto tiempo sigue recordándote que terminó.

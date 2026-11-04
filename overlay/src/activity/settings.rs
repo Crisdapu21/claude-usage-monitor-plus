@@ -15,7 +15,7 @@ pub struct ActivitySettings {
     pub enabled: bool,
     /// Also show the badge while the session's own window is active.
     pub show_when_focused: bool,
-    /// Working animation: "dots", "ring", "bars", "pulse" or "spark".
+    /// Working animation: "bars", "dots", "ring", "pulse" or "spark".
     pub style: String,
     /// "auto", "left" or "right" of the usage widget.
     pub position: String,
@@ -36,7 +36,7 @@ impl Default for ActivitySettings {
         Self {
             enabled: true,
             show_when_focused: false,
-            style: "dots".into(),
+            style: "bars".into(),
             position: "auto".into(),
             size_percent: 100,
             auto_install_hooks: true,

@@ -25,11 +25,11 @@ pub enum Style {
     /// Pinwheel of rounded rays.
     Spark,
     /// Three dots bouncing, like someone typing.
-    #[default]
     Dots,
     /// A spinning arc.
     Ring,
     /// Equaliser bars.
+    #[default]
     Bars,
     /// A calm breathing dot with ripples.
     Pulse,
@@ -40,9 +40,9 @@ impl Style {
         match value.trim().to_ascii_lowercase().as_str() {
             "spark" | "destello" | "asterisco" => Self::Spark,
             "ring" | "anillo" | "spinner" => Self::Ring,
-            "bars" | "barras" => Self::Bars,
+            "dots" | "puntos" => Self::Dots,
             "pulse" | "pulso" => Self::Pulse,
-            _ => Self::Dots,
+            _ => Self::Bars,
         }
     }
 }
@@ -532,7 +532,7 @@ mod tests {
             }
         }
         assert_eq!(Style::parse("Anillo"), Style::Ring);
-        assert_eq!(Style::parse(""), Style::Dots);
+        assert_eq!(Style::parse(""), Style::Bars);
     }
 
     #[test]
