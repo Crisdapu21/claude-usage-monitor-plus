@@ -4,7 +4,7 @@ Es [Claude Code Usage Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Mon
 
 | Estado | Insignia |
 |---|---|
-| Claude trabajando | destello naranja girando (un punto debajo por cada sesión extra) |
+| Claude trabajando | animación naranja a elegir: puntos, anillo, barras, pulso o destello |
 | Necesita tu permiso / una respuesta | círculo ámbar con "!" y pulso |
 | El turno falló (error de API) | círculo rojo con "!" |
 | Terminó | estallido → check verde; queda recordándote hasta que vuelvas |
@@ -40,6 +40,7 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
 ```json
 {
   "enabled": true,
+  "style": "dots",
   "show_when_focused": false,
   "position": "auto",
   "size_percent": 100,
@@ -49,6 +50,7 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
 }
 ```
 
+- `style`: animación de "trabajando": `dots` (puntos), `ring` (anillo), `bars` (barras), `pulse` (pulso) o `spark` (destello).
 - `position`: `auto` (el lado con más espacio), `left` o `right`.
 - `show_when_focused`: `true` para verla aunque tengas la ventana de Claude al frente.
 - `done_minutes`: cuánto tiempo sigue recordándote que terminó.

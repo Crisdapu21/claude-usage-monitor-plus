@@ -15,6 +15,8 @@ pub struct ActivitySettings {
     pub enabled: bool,
     /// Also show the badge while the session's own window is active.
     pub show_when_focused: bool,
+    /// Working animation: "dots", "ring", "bars", "pulse" or "spark".
+    pub style: String,
     /// "auto", "left" or "right" of the usage widget.
     pub position: String,
     /// Badge size as a percentage of the widget's height (50-150).
@@ -34,6 +36,7 @@ impl Default for ActivitySettings {
         Self {
             enabled: true,
             show_when_focused: false,
+            style: "dots".into(),
             position: "auto".into(),
             size_percent: 100,
             auto_install_hooks: true,
@@ -44,6 +47,10 @@ impl Default for ActivitySettings {
 }
 
 impl ActivitySettings {
+    pub fn style(&self) -> super::paint::Style {
+        super::paint::Style::parse(&self.style)
+    }
+
     pub fn side(&self) -> Side {
         Side::parse(&self.position)
     }

@@ -19,6 +19,34 @@ pub enum Look {
     Done,
 }
 
+/// How the "working" state is drawn. The other states are shared.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Style {
+    /// Pinwheel of rounded rays.
+    Spark,
+    /// Three dots bouncing, like someone typing.
+    #[default]
+    Dots,
+    /// A spinning arc.
+    Ring,
+    /// Equaliser bars.
+    Bars,
+    /// A calm breathing dot with ripples.
+    Pulse,
+}
+
+impl Style {
+    pub fn parse(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "spark" | "destello" | "asterisco" => Self::Spark,
+            "ring" | "anillo" | "spinner" => Self::Ring,
+            "bars" | "barras" => Self::Bars,
+            "pulse" | "pulso" => Self::Pulse,
+            _ => Self::Dots,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Rgb(f32, f32, f32);
 
@@ -36,10 +64,19 @@ const WHITE: Rgb = Rgb(1.0, 1.0, 1.0);
 ///   state changes
 /// * `sessions` - how many sessions share this look (dots under the spark)
 /// * `opacity` - 0..1 fade multiplier
-pub fn render(look: Look, t: f32, clock: f32, size: u32, sessions: u32, opacity: f32) -> Vec<u32> {
+pub fn render(look: Look, style: Style, t: f32, clock: f32, size: u32, sessions: u32, opacity: f32) -> Vec<u32> {
     let mut canvas = Canvas::new(size);
     match look {
-        Look::Working => working(&mut canvas, t, clock, sessions),
+        Look::Working => {
+            match style {
+                Style::Spark => working(&mut canvas, t, clock),
+                Style::Dots => working_dots(&mut canvas, t, clock),
+                Style::Ring => working_ring(&mut canvas, t, clock),
+                Style::Bars => working_bars(&mut canvas, t, clock),
+                Style::Pulse => working_pulse(&mut canvas, t, clock),
+            }
+            session_dots(&mut canvas, sessions);
+        }
         Look::Attention => attention(&mut canvas, t, clock, AMBER),
         Look::Failure => attention(&mut canvas, t, clock, RED),
         Look::Done => done(&mut canvas, t, clock),
@@ -47,7 +84,7 @@ pub fn render(look: Look, t: f32, clock: f32, size: u32, sessions: u32, opacity:
     canvas.into_bgra(opacity)
 }
 
-fn working(c: &mut Canvas, t: f32, clock: f32, sessions: u32) {
+fn working(c: &mut Canvas, t: f32, clock: f32) {
     let u = c.unit();
     let (cx, cy) = c.centre();
     let appear = ease_out_back(clamp01(t / 0.35));
@@ -80,7 +117,12 @@ fn working(c: &mut Canvas, t: f32, clock: f32, sessions: u32) {
     }
     c.circle(cx, cy, 3.0 * u * appear, ORANGE, 1.0);
 
-    // One dot per extra session that is working at the same time.
+}
+
+/// One small dot per extra session working at the same time.
+fn session_dots(c: &mut Canvas, sessions: u32) {
+    let u = c.unit();
+    let (cx, _) = c.centre();
     let extra = sessions.saturating_sub(1).min(4);
     if extra > 0 {
         let spacing = 4.2 * u;
@@ -89,6 +131,64 @@ fn working(c: &mut Canvas, t: f32, clock: f32, sessions: u32) {
             c.circle(start + spacing * i as f32, c.size_f() - 2.6 * u, 1.35 * u, ORANGE, 0.95);
         }
     }
+}
+
+fn working_dots(c: &mut Canvas, t: f32, clock: f32) {
+    let u = c.unit();
+    let (cx, cy) = c.centre();
+    let appear = ease_out_back(clamp01(t / 0.35));
+    for i in 0..3 {
+        let phase = (clock * 1.5 - i as f32 * 0.16).rem_euclid(1.0);
+        // Each dot hops once per cycle, then rests.
+        let hop = if phase < 0.45 { (phase / 0.45 * std::f32::consts::PI).sin() } else { 0.0 };
+        let x = cx + (i as f32 - 1.0) * 11.0 * u;
+        let y = cy + 2.0 * u - hop * 7.0 * u;
+        let r = (3.9 + 0.6 * hop) * u * appear;
+        c.glow(x, y, r * 2.2, ORANGE, 0.18 * hop);
+        c.circle(x, y, r, mix(ORANGE, ORANGE_LIGHT, hop * 0.6), 1.0);
+    }
+}
+
+fn working_ring(c: &mut Canvas, t: f32, clock: f32) {
+    let u = c.unit();
+    let (cx, cy) = c.centre();
+    let appear = ease_out_back(clamp01(t / 0.35));
+    let r = 13.0 * u * appear;
+    c.ring(cx, cy, r, 2.3 * u, ORANGE, 0.18);
+    // Arc grows and shrinks while it spins, like a native spinner.
+    let cycle = (clock / 1.6).rem_euclid(1.0);
+    let sweep = 0.25 * TAU + 0.5 * TAU * (0.5 - 0.5 * (cycle * TAU).cos());
+    let start = clock * 4.2 + cycle * 0.8 * TAU;
+    c.arc(cx, cy, r, 2.3 * u, start, sweep, ORANGE, 1.0);
+    c.circle(cx, cy, 3.4 * u * appear * (1.0 + 0.12 * (clock * 3.0).sin()), ORANGE, 1.0);
+}
+
+fn working_bars(c: &mut Canvas, t: f32, clock: f32) {
+    let u = c.unit();
+    let (cx, cy) = c.centre();
+    let appear = ease_out_back(clamp01(t / 0.35));
+    for i in 0..4 {
+        let fi = i as f32;
+        let wave = 0.5 + 0.5 * (clock * 6.0 - fi * 1.1).sin();
+        let h = (4.0 + 11.0 * wave) * u * appear;
+        let x = cx + (fi - 1.5) * 7.5 * u;
+        c.capsule(x, cy - h, x, cy + h, 2.6 * u, mix(ORANGE, ORANGE_LIGHT, wave * 0.5), 1.0);
+    }
+}
+
+fn working_pulse(c: &mut Canvas, t: f32, clock: f32) {
+    let u = c.unit();
+    let (cx, cy) = c.centre();
+    let appear = ease_out_back(clamp01(t / 0.35));
+    let period = 1.8;
+    for offset in [0.0, period / 2.0] {
+        let p = ((clock + offset) % period) / period;
+        let e = ease_out_cubic(p);
+        c.ring(cx, cy, (7.0 + 14.0 * e) * u, 1.5 * u * (1.0 - p).max(0.2), ORANGE, 0.6 * (1.0 - p) * appear);
+    }
+    let breathe = 1.0 + 0.12 * (clock * TAU / period).sin();
+    c.glow(cx, cy, 15.0 * u * appear, ORANGE, 0.22);
+    c.circle(cx, cy, 7.5 * u * appear * breathe, ORANGE, 1.0);
 }
 
 fn attention(c: &mut Canvas, t: f32, clock: f32, colour: Rgb) {
@@ -293,6 +393,33 @@ impl Canvas {
         );
     }
 
+    /// Stroke of a circle from `start` over `sweep` radians, round ends.
+    #[allow(clippy::too_many_arguments)]
+    fn arc(&mut self, cx: f32, cy: f32, r: f32, half_width: f32, start: f32, sweep: f32, colour: Rgb, alpha: f32) {
+        if r <= 0.0 || half_width <= 0.0 {
+            return;
+        }
+        let o = r + half_width + 1.0;
+        let end = start + sweep;
+        let (ax, ay) = (cx + r * start.cos(), cy + r * start.sin());
+        let (bx, by) = (cx + r * end.cos(), cy + r * end.sin());
+        self.shade(
+            (cx - o, cy - o, cx + o, cy + o),
+            |x, y| {
+                let (dx, dy) = (x - cx, y - cy);
+                let delta = (dy.atan2(dx) - start).rem_euclid(TAU);
+                let d = if delta <= sweep {
+                    ((dx * dx + dy * dy).sqrt() - r).abs()
+                } else {
+                    ((x - ax).powi(2) + (y - ay).powi(2)).sqrt().min(((x - bx).powi(2) + (y - by).powi(2)).sqrt())
+                };
+                edge(d - half_width)
+            },
+            colour,
+            alpha,
+        );
+    }
+
     /// Soft radial halo that fades to nothing at `r`.
     fn glow(&mut self, cx: f32, cy: f32, r: f32, colour: Rgb, alpha: f32) {
         if r <= 0.0 {
@@ -375,7 +502,7 @@ mod tests {
     fn frames_have_requested_size_and_are_premultiplied() {
         for look in [Look::Working, Look::Attention, Look::Failure, Look::Done] {
             for t in [0.0, 0.2, 0.6, 1.0, 2.5, 7.3] {
-                let frame = render(look, t, t + 3.0, 40, 2, 1.0);
+                let frame = render(look, Style::Dots, t, t + 3.0, 40, 2, 1.0);
                 assert_eq!(frame.len(), 40 * 40);
                 for px in &frame {
                     let a = alpha(*px);
@@ -387,8 +514,8 @@ mod tests {
 
     #[test]
     fn badge_is_visible_once_settled_and_corners_stay_clear() {
-        for look in [Look::Working, Look::Attention, Look::Done] {
-            let frame = render(look, 3.0, 9.0, 48, 1, 1.0);
+        for look in [Look::Attention, Look::Done] {
+            let frame = render(look, Style::Dots, 3.0, 9.0, 48, 1, 1.0);
             let centre = frame[24 * 48 + 24];
             assert!(alpha(centre) > 200, "{look:?} centre alpha {}", alpha(centre));
             assert_eq!(alpha(frame[0]), 0, "{look:?} corner must be transparent");
@@ -396,9 +523,22 @@ mod tests {
     }
 
     #[test]
+    fn every_working_style_draws_something_inside_the_square() {
+        for style in [Style::Spark, Style::Dots, Style::Ring, Style::Bars, Style::Pulse] {
+            for t in [0.5f32, 1.3, 4.1] {
+                let frame = render(Look::Working, style, t, t, 48, 1, 1.0);
+                assert!(frame.iter().filter(|px| alpha(**px) > 128).count() > 40, "{style:?}");
+                assert_eq!(alpha(frame[0]), 0, "{style:?} corner");
+            }
+        }
+        assert_eq!(Style::parse("Anillo"), Style::Ring);
+        assert_eq!(Style::parse(""), Style::Dots);
+    }
+
+    #[test]
     fn opacity_scales_output() {
-        let full = render(Look::Done, 3.0, 3.0, 32, 1, 1.0);
-        let none = render(Look::Done, 3.0, 3.0, 32, 1, 0.0);
+        let full = render(Look::Done, Style::Dots, 3.0, 3.0, 32, 1, 1.0);
+        let none = render(Look::Done, Style::Dots, 3.0, 3.0, 32, 1, 0.0);
         assert!(full.iter().any(|px| alpha(*px) > 0));
         assert!(none.iter().all(|px| *px == 0));
     }

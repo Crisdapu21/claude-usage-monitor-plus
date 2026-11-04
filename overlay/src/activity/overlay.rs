@@ -446,7 +446,7 @@ impl Overlay {
         let size = placement.screen.width().max(1) as u32;
         let t = self.look_since.elapsed().as_secs_f32();
         let clock = self.clock.elapsed().as_secs_f32();
-        let pixels = paint::render(look, t, clock, size, self.summary.count, ease(self.opacity));
+        let pixels = paint::render(look, self.settings.style(), t, clock, size, self.summary.count, ease(self.opacity));
         present(self.hwnd, &pixels, size);
         if !self.shown {
             unsafe {
