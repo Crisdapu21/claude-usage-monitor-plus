@@ -37,6 +37,9 @@ pub struct SessionRecord {
     pub host_hwnd: i64,
     pub host_pid: u32,
     pub host_exe: String,
+    /// The Claude Code process itself; when it exits, the session is over.
+    pub agent_pid: u32,
+    pub agent_exe: String,
     pub last_event: String,
     pub message: String,
 }
@@ -116,7 +119,7 @@ pub fn apply_event(existing: Option<&SessionRecord>, input: &HookInput, now_ms: 
     }
     record.last_event = input.hook_event_name.clone();
     record.message = input.message.chars().take(200).collect();
-    let refresh_host = new_turn || record.host_hwnd == 0;
+    let refresh_host = new_turn || record.host_hwnd == 0 || record.agent_pid == 0;
     Update::Write { record, refresh_host }
 }
 
@@ -164,7 +167,7 @@ pub struct Timing {
 impl Default for Timing {
     fn default() -> Self {
         Self {
-            stale_ms: 20 * 60_000,
+            stale_ms: 10 * 60_000,
             done_ttl_ms: 30 * 60_000,
             attention_ttl_ms: 60 * 60_000,
         }
@@ -182,13 +185,15 @@ pub struct Observation {
     pub interrupted: bool,
     /// The user dismissed the working badge for this turn.
     pub muted: bool,
+    /// The Claude Code process that wrote this record has exited.
+    pub gone: bool,
     /// Last write to the transcript, a heartbeat for long tool calls.
     pub transcript_mtime_ms: u64,
 }
 
 /// What one session contributes to the badge, if anything.
 pub fn session_look(record: &SessionRecord, obs: Observation, now_ms: u64, timing: Timing) -> Option<Look> {
-    if obs.interrupted {
+    if obs.interrupted || obs.gone {
         return None;
     }
     let age = now_ms.saturating_sub(record.updated_ms);
@@ -459,6 +464,8 @@ mod tests {
         assert_eq!(session_look(&record, heartbeat, late, timing), Some(Look::Working));
         let interrupted = Observation { interrupted: true, ..Default::default() };
         assert_eq!(session_look(&record, interrupted, 10, timing), None);
+        let gone = Observation { gone: true, ..Default::default() };
+        assert_eq!(session_look(&record, gone, 10, timing), None);
         let muted = Observation { muted: true, ..Default::default() };
         assert_eq!(session_look(&record, muted, 10, timing), None);
     }

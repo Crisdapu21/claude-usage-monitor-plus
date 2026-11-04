@@ -31,6 +31,10 @@ pub fn run() -> i32 {
                     record.host_pid = host.pid;
                     record.host_exe = host.exe;
                 }
+                if let Some((pid, exe)) = process::find_agent() {
+                    record.agent_pid = pid;
+                    record.agent_exe = exe;
+                }
             }
             if let Err(error) = store::write_record(&dir, &record) {
                 super::log(format!("activity hook: unable to write record: {error}"));

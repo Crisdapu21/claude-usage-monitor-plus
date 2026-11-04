@@ -331,7 +331,13 @@ impl Overlay {
         let acknowledged = self.acknowledged.get(&record.session_id) == Some(&record.updated_ms);
         let muted = self.muted.get(&record.session_id) == Some(&record.turn_started_ms);
 
-        let mut obs = Observation { focused, acknowledged, muted, ..Default::default() };
+        // Session closed without SessionEnd (window closed, crash, killed):
+        // its Claude Code process is gone, so forget the record.
+        let gone = record.agent_pid != 0 && !process::process_alive(record.agent_pid, &record.agent_exe);
+        if gone {
+            store::delete_record(&settings::sessions_dir(), &record.session_id);
+        }
+        let mut obs = Observation { focused, acknowledged, muted, gone, ..Default::default() };
         if matches!(record.phase, Phase::Working | Phase::Attention) && !record.transcript_path.is_empty() {
             let state = self.transcripts.entry(record.transcript_path.clone()).or_default();
             state.mtime_ms = modified(&PathBuf::from(&record.transcript_path))

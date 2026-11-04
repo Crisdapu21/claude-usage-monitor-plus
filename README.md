@@ -46,7 +46,7 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
   "size_percent": 100,
   "auto_install_hooks": true,
   "done_minutes": 30,
-  "stale_minutes": 20
+  "stale_minutes": 10
 }
 ```
 
@@ -55,6 +55,8 @@ Para ver las animaciones sin usar Claude: `claude-code-usage-monitor.exe --activ
 - `show_when_focused`: `true` para verla aunque tengas la ventana de Claude al frente.
 - `done_minutes`: cuánto tiempo sigue recordándote que terminó.
 - `stale_minutes`: si una sesión "trabajando" no da señales en ese tiempo, se oculta.
+
+Si la insignia se queda pegada: clic derecho sobre ella, o `claude-code-usage-monitor.exe --activity-reset` para borrar todas las sesiones guardadas.
 
 Quitar los hooks: `claude-code-usage-monitor.exe --activity-uninstall-hooks`. Volver a ponerlos: `--activity-install-hooks`.
 

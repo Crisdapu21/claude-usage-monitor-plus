@@ -94,6 +94,26 @@ pub fn find_host(cwd: &str, prompt_submitted: bool) -> Host {
     Host::default()
 }
 
+/// The Claude Code process running this hook: the nearest ancestor that is
+/// not a shell. Returns (pid, exe file name).
+pub fn find_agent() -> Option<(u32, String)> {
+    const SHELLS: &[&str] = &[
+        "bash.exe", "sh.exe", "cmd.exe", "powershell.exe", "pwsh.exe", "conhost.exe",
+        "openconsole.exe", "env.exe", "wsl.exe", "zsh.exe",
+    ];
+    parent_chain()
+        .into_iter()
+        .find(|(_, exe)| !SHELLS.contains(&exe.to_ascii_lowercase().as_str()))
+}
+
+/// True while `pid` is still the same program that wrote the record.
+pub fn process_alive(pid: u32, exe: &str) -> bool {
+    match exe_name(pid) {
+        Some(name) => exe.is_empty() || name.eq_ignore_ascii_case(exe),
+        None => false,
+    }
+}
+
 /// Is the session's window the active one?
 pub fn host_is_foreground(host_hwnd: i64, host_exe: &str, foreground: &Foreground) -> bool {
     if foreground.hwnd == 0 {

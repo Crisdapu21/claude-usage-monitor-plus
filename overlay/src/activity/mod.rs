@@ -29,6 +29,13 @@ pub fn handle_cli_mode(args: &[String]) -> Option<i32> {
     match flag {
         install::HOOK_ARG => Some(hook::run()),
         "--activity-demo" => Some(hook::demo()),
+        "--activity-reset" => {
+            let dir = settings::sessions_dir();
+            for (_, record) in store::list_records(&dir) {
+                store::delete_record(&dir, &record.session_id);
+            }
+            Some(0)
+        }
         "--activity-install-hooks" => Some(match ensure_hooks(true) {
             Ok(message) => {
                 message_box(&message, false);

@@ -41,7 +41,7 @@ impl Default for ActivitySettings {
             size_percent: 100,
             auto_install_hooks: true,
             done_minutes: 30,
-            stale_minutes: 20,
+            stale_minutes: 10,
         }
     }
 }
